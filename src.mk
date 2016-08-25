@@ -30,6 +30,8 @@ LIB_SOURCES =                                                   \
   db/internal_stats.cc                                          \
   db/log_reader.cc                                              \
   db/log_writer.cc                                              \
+  db/blob_log_reader.cc                                         \
+  db/blob_log_writer.cc                                         \
   db/managed_iterator.cc                                        \
   db/memtable_allocator.cc                                      \
   db/memtable.cc                                                \

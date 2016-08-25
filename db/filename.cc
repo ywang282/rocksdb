@@ -75,6 +75,11 @@ std::string LogFileName(const std::string& name, uint64_t number) {
   return MakeFileName(name, number, "log");
 }
 
+std::string BlobFileName(const std::string& blobdirname, uint64_t number) {
+  assert(number > 0);
+  return MakeFileName(blobdirname, number, "blob");
+}
+
 std::string ArchivalDirectory(const std::string& dir) {
   return dir + "/" + ARCHIVAL_DIR;
 }
@@ -221,7 +226,7 @@ std::string IdentityFileName(const std::string& dbname) {
 //    dbname/<info_log_name_prefix>
 //    dbname/<info_log_name_prefix>.old.[0-9]+
 //    dbname/MANIFEST-[0-9]+
-//    dbname/[0-9]+.(log|sst)
+//    dbname/[0-9]+.(log|sst|blob)
 //    dbname/METADB-[0-9]+
 //    dbname/OPTIONS-[0-9]+
 //    dbname/OPTIONS-[0-9]+.dbtmp
@@ -336,6 +341,8 @@ bool ParseFileName(const std::string& fname, uint64_t* number,
     } else if (suffix == Slice(kRocksDbTFileExt) ||
                suffix == Slice(kLevelDbTFileExt)) {
       *type = kTableFile;
+    } else if (suffix == Slice("blob")) {
+      *type = kBlobFile;
     } else if (suffix == Slice(kTempFileNameSuffix)) {
       *type = kTempFile;
     } else {
