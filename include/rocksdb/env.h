@@ -170,7 +170,10 @@ class Env {
   // The returned file will only be accessed by one thread at a time.
   virtual Status ReopenWritableFile(const std::string& fname,
                                  unique_ptr<WritableFile>* result,
-                                 const EnvOptions& options) = 0;
+                                 const EnvOptions& options) {
+    Status s;
+    return s;
+  }
 
   // Reuse an existing file by renaming it and opening it as writable.
   virtual Status ReuseWritableFile(const std::string& fname,
