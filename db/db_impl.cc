@@ -4545,6 +4545,15 @@ const Snapshot* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary) {
                         is_write_conflict_boundary);
 }
 
+bool DBImpl::HasActiveSnapshotLaterThanSN(SequenceNumber sn) {
+
+  InstrumentedMutexLock l(&mutex_);
+  if (snapshots_.empty())
+    return false;
+
+  return (snapshots_.newest()->GetSequenceNumber() > sn);
+}
+
 void DBImpl::ReleaseSnapshot(const Snapshot* s) {
   const SnapshotImpl* casted_s = reinterpret_cast<const SnapshotImpl*>(s);
   {
