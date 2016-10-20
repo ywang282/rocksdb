@@ -44,6 +44,8 @@ class SequentialFileReader {
 
   Status Skip(uint64_t n);
 
+  void Rewind();
+
   SequentialFile* file() { return file_.get(); }
 };
 

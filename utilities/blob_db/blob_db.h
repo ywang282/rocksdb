@@ -46,7 +46,7 @@ struct BlobDBOptions {
   // first bucket is 1471542000 - 1471542600
   // second bucket is 1471542600 - 1471543200
   // and so on
-  uint64_t ttl_range;
+  uint32_t ttl_range;
 
   // at what size will the blobs be stored in separate log rather than
   // inline

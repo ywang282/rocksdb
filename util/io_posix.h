@@ -50,6 +50,7 @@ class PosixSequentialFile : public SequentialFile {
 
   virtual Status Read(size_t n, Slice* result, char* scratch) override;
   virtual Status Skip(uint64_t n) override;
+  virtual void Rewind() override;
   virtual Status InvalidateCache(size_t offset, size_t length) override;
 };
 
