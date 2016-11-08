@@ -325,6 +325,7 @@ MAIN_SOURCES =                                                    \
   util/mock_env_test.cc                                                 \
   util/options_test.cc                                                  \
   util/event_logger_test.cc                                             \
+  util/timer_queue_test.cc                                             \
   util/rate_limiter_test.cc                                             \
   util/slice_transform_test.cc                                          \
   util/thread_list_test.cc                                              \
