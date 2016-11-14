@@ -225,6 +225,16 @@ class EventListener {
   virtual void OnFlushCompleted(DB* /*db*/,
                                 const FlushJobInfo& /*flush_job_info*/) {}
 
+  // A call-back function to RocksDB which will be called before a
+  // RocksDB starts to flush memtables.  The default implementation is
+  // no-op.
+  //
+  // Note that the this function must be implemented in a way such that
+  // it should not run for an extended period of time before the function
+  // returns.  Otherwise, RocksDB may be blocked.
+  virtual void OnFlushBegin(DB* /*db*/,
+                            const FlushJobInfo& /*flush_job_info*/) {}
+
   // A call-back function for RocksDB which will be called whenever
   // a SST file is deleted.  Different from OnCompactionCompleted and
   // OnFlushCompleted, this call-back is designed for external logging
