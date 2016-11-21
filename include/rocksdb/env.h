@@ -899,12 +899,9 @@ class EnvWrapper : public Env {
   }
   Status ReopenWritableFile(const std::string& fname,
                             unique_ptr<WritableFile>* result,
-                            const EnvOptions& options) {
-
-    Status s;
-    return s;
+                            const EnvOptions& options) override {
+    return target_->ReopenWritableFile(fname, result, options);
   }
-
   Status ReuseWritableFile(const std::string& fname,
                            const std::string& old_fname,
                            unique_ptr<WritableFile>* r,
