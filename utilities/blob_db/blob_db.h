@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <string>
 #include <functional>
+#include <string>
+#include <vector>
 #include "rocksdb/db.h"
 #include "rocksdb/status.h"
 #include "rocksdb/utilities/stackable_db.h"
@@ -23,7 +24,6 @@ namespace rocksdb {
 // users to use blob DB.
 
 struct BlobDBOptions {
-
   // name of the directory under main db, where blobs will be stored.
   // default is "blob_dir"
   std::string blob_dir;
@@ -103,9 +103,9 @@ struct BlobDBOptions {
   // how often to schedule check seq files period
   uint32_t check_seqf_period;
 
-  // this function is to be provided by client if they intend to 
+  // this function is to be provided by client if they intend to
   // use Put API to provide TTL.
-  // the first argument is the value in the Put API 
+  // the first argument is the value in the Put API
   // in case you want to do some modifications to the value,
   // return a new Slice in the second.
   // otherwise just copy the input value into output.
@@ -121,7 +121,6 @@ struct BlobDBOptions {
 };
 
 class BlobDB : public StackableDB {
-
  public:
   // the suffix to a blob value to represent "ttl:TTLVAL"
   static const uint64_t kTTLSuffixLength = 8;
@@ -188,10 +187,10 @@ class BlobDB : public StackableDB {
   virtual Status Write(const WriteOptions& opts, WriteBatch* updates)
     override = 0;
 
-  // Starting point for opening a Blob DB. 
+  // Starting point for opening a Blob DB.
   // changed_options - critical. Blob DB loads and inserts listeners
   // into options which are necessary for recovery and atomicity
-  // Use this pattern if you need control on step 2, i.e. your 
+  // Use this pattern if you need control on step 2, i.e. your
   // BaseDB is not just a simple rocksdb but a stacked DB
   // 1. ::OpenAndLoad
   // 2. Open Base DB with the changed_options
@@ -203,7 +202,7 @@ class BlobDB : public StackableDB {
   // This is necessary to link the Base DB to BlobDB
   static Status LinkToBaseDB(BlobDB *blob_db, DB *base_db);
 
-  // This is another way to open BLOB DB which do not have other 
+  // This is another way to open BLOB DB which do not have other
   // Stackable DB's in play
   // Steps.
   // 1. ::Open
@@ -215,8 +214,7 @@ class BlobDB : public StackableDB {
 
   virtual Status LinkToBaseDB(DB *db_base) = 0;
 
-protected:
-
+ protected:
   explicit BlobDB(DB* db);
 };
 
