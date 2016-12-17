@@ -10,6 +10,23 @@
 
 namespace rocksdb {
 
+CompactionFilter::ValueType fromInternalValueType(ValueType vt) {
+  switch (vt) {
+    case kTypeDeletion:
+      return CompactionFilter::ValueType::kDelete;
+    case kTypeValue:
+      return CompactionFilter::ValueType::kValue;
+    case kTypeMerge:
+      return CompactionFilter::ValueType::kMergeOperand;
+    case kTypeSingleDeletion:
+      return CompactionFilter::ValueType::kSingleDelete;
+    case kTypeRangeDeletion:
+      return CompactionFilter::ValueType::kRangeDelete;
+    default :
+      assert(false);
+  }
+}
+
 CompactionIterator::CompactionIterator(
     InternalIterator* input, const Comparator* cmp, MergeHelper* merge_helper,
     SequenceNumber last_sequence, std::vector<SequenceNumber>* snapshots,
@@ -43,6 +60,7 @@ CompactionIterator::CompactionIterator(
       compaction_(std::move(compaction)),
       compaction_filter_(compaction_filter),
       log_buffer_(log_buffer),
+      all_versions_(false),
       merge_out_iter_(merge_helper_) {
   assert(compaction_filter_ == nullptr || compaction_ != nullptr);
   bottommost_level_ =
@@ -61,8 +79,11 @@ CompactionIterator::CompactionIterator(
     earliest_snapshot_ = snapshots_->at(0);
     latest_snapshot_ = snapshots_->back();
   }
-  if (compaction_filter_ != nullptr && compaction_filter_->IgnoreSnapshots()) {
-    ignore_snapshots_ = true;
+  if (compaction_filter_ != nullptr) {
+     if (compaction_filter_->IgnoreSnapshots())
+       ignore_snapshots_ = true;
+     if (compaction_filter_->AllVersions())
+       all_versions_ = true;
   } else {
     ignore_snapshots_ = false;
   }
@@ -187,6 +208,10 @@ void CompactionIterator::NextFromInput() {
       current_user_key_sequence_ = kMaxSequenceNumber;
       current_user_key_snapshot_ = 0;
 
+      if (all_versions_)
+        compaction_filter_->Callback(compaction_->level(), ikey_.user_key,
+            fromInternalValueType(ikey_.type), value_, ikey_.sequence, true);
+
       // apply the compaction filter to the first occurrence of the user key
       if (compaction_filter_ != nullptr && ikey_.type == kTypeValue &&
           (visible_at_tip_ || ikey_.sequence > latest_snapshot_ ||
@@ -233,6 +258,9 @@ void CompactionIterator::NextFromInput() {
         }
       }
     } else {
+      if (all_versions_)
+        compaction_filter_->Callback(compaction_->level(), ikey_.user_key,
+            fromInternalValueType(ikey_.type), value_, ikey_.sequence, false);
       // Update the current key to reflect the new sequence number/type without
       // copying the user key.
       // TODO(rven): Compaction filter does not process keys in this path
@@ -392,7 +420,7 @@ void CompactionIterator::NextFromInput() {
       // is the same as the visibility of a previous instance of the
       // same key, then this kv is not visible in any snapshot.
       // Hidden by an newer entry for same user key
-      // TODO: why not > ?
+      // TODO(noetzli): why not > ?
       //
       // Note: Dropping this key will not affect TransactionDB write-conflict
       // checking since there has already been a record returned for this key
