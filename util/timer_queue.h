@@ -3,6 +3,11 @@
 // http://www.crazygaze.com/blog/2016/03/24/portable-c-timer-queue/
 //
 
+////////////////////////////////////////////////////////////////////////////////
+// borrowed from
+// http://www.crazygaze.com/blog/2016/03/24/portable-c-timer-queue/
+// Timer Queue
+//
 // License
 //
 // The source code in this article is licensed under the CC0 license, so feel
@@ -29,11 +34,6 @@
 #include <utility>
 #include <vector>
 
-////////////////////////////////////////////////////////////////////////////////
-// borrowed from
-// http://www.crazygaze.com/blog/2016/03/24/portable-c-timer-queue/
-// Timer Queue
-//
 // Allows execution of handlers at a specified time in the future
 // Guarantees:
 //  - All handlers are executed ONCE, even if cancelled (aborted parameter will
@@ -47,8 +47,7 @@
 // http://www.crazygaze.com/blog/2016/03/24/portable-c-timer-queue/
 class TimerQueue {
  public:
-  TimerQueue() : m_th(&TimerQueue::run, this) {
-  }
+  TimerQueue() : m_th(&TimerQueue::run, this) {}
 
   ~TimerQueue() {
     cancelAll();

@@ -30,9 +30,6 @@ LIB_SOURCES =                                                   \
   db/internal_stats.cc                                          \
   db/log_reader.cc                                              \
   db/log_writer.cc                                              \
-  db/blob_log_reader.cc                                         \
-  db/blob_log_writer.cc                                         \
-  db/blob_log_format.cc                                         \
   db/managed_iterator.cc                                        \
   db/memtable_allocator.cc                                      \
   db/memtable.cc                                                \
@@ -150,6 +147,9 @@ LIB_SOURCES =                                                   \
   utilities/backupable/backupable_db.cc                         \
   utilities/blob_db/blob_db.cc                                  \
   utilities/blob_db/blob_db_impl.cc                             \
+  utilities/blob_db/blob_log_reader.cc                          \
+  utilities/blob_db/blob_log_writer.cc                          \
+  utilities/blob_db/blob_log_format.cc                          \
   utilities/convenience/info_log_finder.cc                      \
   utilities/checkpoint/checkpoint.cc                            \
   utilities/compaction_filters/remove_emptyvalue_compactionfilter.cc    \

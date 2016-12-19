@@ -531,7 +531,6 @@ class DBImpl : public DB {
   std::unordered_map<std::string, RecoveredTransaction*>
       recovered_transactions_;
 
-
   InternalIterator* NewInternalIterator(const ReadOptions&,
                                         ColumnFamilyData* cfd,
                                         SuperVersion* super_version,

@@ -1891,11 +1891,9 @@ Status DBImpl::FlushMemTableToOutputFile(
   flush_job.PickMemTable();
 
 #ifndef ROCKSDB_LITE
-   if (immutable_db_options_.flush_begin_listeners) {
-     // may temporarily unlock and lock the mutex.
-     NotifyOnFlushBegin(cfd, &file_meta, mutable_cf_options,
-                        job_context->job_id, flush_job.GetTableProperties());
-   }
+  // may temporarily unlock and lock the mutex.
+  NotifyOnFlushBegin(cfd, &file_meta, mutable_cf_options, job_context->job_id,
+                     flush_job.GetTableProperties());
 #endif  // ROCKSDB_LITE
 
   Status s;
@@ -1961,10 +1959,9 @@ Status DBImpl::FlushMemTableToOutputFile(
   return s;
 }
 
-void DBImpl::NotifyOnFlushBegin(ColumnFamilyData* cfd,
-                                    FileMetaData* file_meta,
-                                    const MutableCFOptions& mutable_cf_options,
-                                    int job_id, TableProperties prop) {
+void DBImpl::NotifyOnFlushBegin(ColumnFamilyData* cfd, FileMetaData* file_meta,
+                                const MutableCFOptions& mutable_cf_options,
+                                int job_id, TableProperties prop) {
 #ifndef ROCKSDB_LITE
   if (immutable_db_options_.listeners.size() == 0U) {
     return;
@@ -2000,8 +1997,8 @@ void DBImpl::NotifyOnFlushBegin(ColumnFamilyData* cfd,
     }
   }
   mutex_.Lock();
-  // no need to signal bg_cv_ as it will be signaled at the end of the
-  // flush process.
+// no need to signal bg_cv_ as it will be signaled at the end of the
+// flush process.
 #endif  // ROCKSDB_LITE
 }
 
@@ -4598,10 +4595,8 @@ const Snapshot* DBImpl::GetSnapshotImpl(bool is_write_conflict_boundary) {
 }
 
 bool DBImpl::HasActiveSnapshotLaterThanSN(SequenceNumber sn) {
-
   InstrumentedMutexLock l(&mutex_);
-  if (snapshots_.empty())
-    return false;
+  if (snapshots_.empty()) return false;
 
   return (snapshots_.newest()->GetSequenceNumber() > sn);
 }

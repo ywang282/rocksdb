@@ -3,26 +3,26 @@
 //  LICENSE file in the root directory of this source tree. An additional grant
 //  of patent rights can be found in the PATENTS file in the same directory.
 //
-// Copyright (c) 2011 The LevelDB Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file. See the AUTHORS file for names of contributors.
-//
 // Log format information shared by reader and writer.
 
 #pragma once
 
+#ifndef ROCKSDB_LITE
+
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
+#include "rocksdb/options.h"
 #include "rocksdb/status.h"
 #include "rocksdb/types.h"
 
 namespace rocksdb {
 
-  class BlobFile;
-
-namespace blob_log {
+namespace blobstorage {
+class BlobFile;
+class BlobDBImpl;
 
 enum RecordType : uint8_t {
   // Zero is reserved for preallocated files
@@ -32,6 +32,7 @@ enum RecordType : uint8_t {
   kFirstType = 1,
   kMiddleType = 2,
   kLastType = 3,
+  kMaxRecordType = kLastType
 };
 
 enum RecordSubType : uint8_t {
@@ -40,32 +41,35 @@ enum RecordSubType : uint8_t {
   kTimestampType = 2,
 };
 
-const uint32_t kMagicNumber = 2395959;
+extern const uint32_t kMagicNumber;
 
 class Reader;
 
+typedef std::pair<uint32_t, uint32_t> ttlrange_t;
+typedef std::pair<uint64_t, uint64_t> tsrange_t;
+typedef std::pair<rocksdb::SequenceNumber, rocksdb::SequenceNumber> snrange_t;
+
 class BlobLogHeader {
+  friend class BlobFile;
+  friend class BlobDBImpl;
+
  private:
-    uint32_t magic_number_ = 0;
-    std::pair<uint32_t, uint32_t> ttl_guess_;
-    std::pair<uint64_t, uint64_t> ts_guess_;
-    bool has_ttl_;
-    bool has_ts_;
+  uint32_t magic_number_ = 0;
+  CompressionType compression_;
+  std::unique_ptr<ttlrange_t> ttl_guess_;
+  std::unique_ptr<tsrange_t> ts_guess_;
+
+ private:
+  void setTTLGuess(const ttlrange_t& ttl) {
+    ttl_guess_.reset(new ttlrange_t(ttl));
+  }
+
+  void setTSGuess(const tsrange_t& ts) { ts_guess_.reset(new tsrange_t(ts)); }
 
  public:
   // magic number + flags + ttl guess + timestamp range
   static const size_t kHeaderSize = 4 + 4 + 4 * 2 + 8 * 2;
   // 32
-
-  void setTTL(bool ttl = true)  { has_ttl_ = ttl; }
-
-  void setTimestamps(bool ts = true) { has_ts_ = ts; }
-
-  void setTTLGuess(const std::pair<uint32_t, uint32_t>& ttl)
-  { ttl_guess_ = ttl; has_ttl_ = true; }
-
-  void setTSGuess(const std::pair<uint64_t, uint64_t>& ts)
-  { ts_guess_ = ts; has_ts_ = true; }
 
   void EncodeTo(std::string* dst) const;
 
@@ -73,15 +77,17 @@ class BlobLogHeader {
 
   BlobLogHeader();
 
-  bool HasTTL() const { return has_ttl_; }
+  bool HasTTL() const { return !!ttl_guess_; }
 
-  bool HasTimestamps() const { return has_ts_; }
+  bool HasTimestamp() const { return !!ts_guess_; }
+
+  BlobLogHeader& operator=(BlobLogHeader&& in) noexcept;
 };
 
 // Footer encapsulates the fixed information stored at the tail
 // end of every blob log file.
 class BlobLogFooter {
-  friend class rocksdb::BlobFile;
+  friend class BlobFile;
 
  public:
   // Use this constructor when you plan to write out the footer using
@@ -105,35 +111,34 @@ class BlobLogFooter {
   // = 56
   static const int kFooterSize = 4 + 4 + 8 + (4 * 2) + (8 * 2) + (8 * 2);
 
-  bool HasTTL() const { return has_ttl_; }
+  bool HasTTL() const { return !!ttl_range_; }
 
-  bool HasTimestamps() const { return has_ts_; }
+  bool HasTimestamp() const { return !!ts_range_; }
 
   uint64_t GetBlobCount() const { return blob_count_; }
 
-  const std::pair<uint32_t, uint32_t>& GetTTLRange() const
-  { return ttl_range_; }
+  const ttlrange_t& GetTTLRange() const { return *(ttl_range_.get()); }
 
-  const std::pair<uint64_t, uint64_t>& GetTimeRange() const
-  { return ts_range_; }
+  const tsrange_t& GetTimeRange() const { return *(ts_range_.get()); }
 
-  const std::pair<SequenceNumber, SequenceNumber>& GetSNRange() const
-  { return sn_range_; }
+  const snrange_t& GetSNRange() const { return sn_range_; }
 
  private:
   uint32_t magic_number_ = 0;
   uint64_t blob_count_ = 0;
-  bool has_ttl_;
-  bool has_ts_;
 
-  std::pair<uint32_t, uint32_t> ttl_range_;
-  std::pair<uint64_t, uint64_t> ts_range_;
-  std::pair<SequenceNumber, SequenceNumber> sn_range_;
+  std::unique_ptr<ttlrange_t> ttl_range_;
+  std::unique_ptr<tsrange_t> ts_range_;
+  snrange_t sn_range_;
+
+ private:
+  void setTTLRange(const ttlrange_t& ttl) {
+    ttl_range_.reset(new ttlrange_t(ttl));
+  }
+  void setTimeRange(const tsrange_t& ts) { ts_range_.reset(new tsrange_t(ts)); }
 };
 
-const int kMaxRecordType = kLastType;
-
-const unsigned int kBlockSize = 32768;
+extern const size_t kBlockSize;
 
 class BlobLogRecord {
   friend class Reader;
@@ -151,16 +156,28 @@ class BlobLogRecord {
   char subtype_;
   Slice key_;
   Slice blob_;
-  char *key_buffer_;
-  uint64_t kbs_;
-  char *blob_buffer_;
-  uint64_t bbs_;
+  std::unique_ptr<char[]> key_buffer_;
+  size_t kbs_;
+  std::unique_ptr<char[]> blob_buffer_;
+  size_t bbs_;
+
+ private:
+  void clear();
+
+  char* getKeyBuffer() { return key_buffer_.get(); }
+
+  char* getBlobBuffer() { return blob_buffer_.get(); }
+
+  void resizeKeyBuffer(size_t kbs);
+
+  void resizeBlobBuffer(size_t bbs);
 
  public:
-  // Header is checksum (4 bytes), header checksum (4bytes),
+  // Header is
   // Key Length ( 4 bytes ),
   // Blob Length ( 8 bytes), timestamp/ttl (8 bytes),
   // type (1 byte), subtype (1 byte)
+  // header checksum (4 bytes), blob checksum (4 bytes),
   // = 34
   static const int kHeaderSize = 4 + 4 + 4 + 8 + 4 + 8 + 1 + 1;
 
@@ -171,23 +188,13 @@ class BlobLogRecord {
 
   ~BlobLogRecord();
 
-  void clear();
-
-  char *getKeyBuffer() { return key_buffer_; }
-
-  char *getBlobBuffer() { return blob_buffer_; }
-
-  void resizeKeyBuffer(uint64_t kbs);
-
-  void resizeBlobBuffer(uint64_t bbs);
-
   const Slice& Key() const { return key_; }
 
   const Slice& Blob() const { return blob_; }
 
   uint32_t GetKeySize() const { return key_size_; }
 
-  uint64_t GetBlobSize()  const { return blob_size_; }
+  uint64_t GetBlobSize() const { return blob_size_; }
 
   uint32_t GetTTL() const { return ttl_val_; }
 
@@ -195,9 +202,9 @@ class BlobLogRecord {
 
   SequenceNumber GetSN() const { return sn_; }
 
-  Status DecodeHeaderFrom(Slice* input);
+  Status DecodeHeaderFrom(const Slice& hdrslice);
 };
 
-
-}  // namespace blob_log
+}  // namespace blobstorage
 }  // namespace rocksdb
+#endif  // ROCKSDB_LITE

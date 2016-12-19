@@ -41,6 +41,7 @@ class CompactionFilter {
     kSingleDelete,
     kRangeDelete,
     kDelete,
+    kInvalid,
   };
 
   enum class Decision {
@@ -170,17 +171,16 @@ class CompactionFilter {
         bool rv = FilterMergeOperand(level, key, existing_value);
         return rv ? Decision::kRemove : Decision::kKeep;
       }
-      default :
+      default:
         assert(false);
     }
     assert(false);
     return Decision::kKeep;
   }
 
-  virtual void Callback(int level, const Slice& key,
-      ValueType value_type, const Slice& existing_value,
-      const SequenceNumber& sn, bool is_new) const {
-  }
+  virtual void Callback(int level, const Slice& key, ValueType value_type,
+                        const Slice& existing_value, const SequenceNumber& sn,
+                        bool is_new) const {}
 
   // By default, compaction will only call Filter() on keys written after the
   // most recent call to GetSnapshot(). However, if the compaction filter

@@ -5,9 +5,11 @@
 
 #pragma once
 
+#ifndef ROCKSDB_LITE
 
 #include <atomic>
 #include <condition_variable>
+#include <ctime>
 #include <list>
 #include <memory>
 #include <set>
@@ -16,42 +18,42 @@
 #include <utility>
 #include <vector>
 
-#include "db/blob_log_format.h"
-#include "db/blob_log_reader.h"
-#include "db/blob_log_writer.h"
 #include "rocksdb/compaction_filter.h"
 #include "rocksdb/db.h"
 #include "rocksdb/listener.h"
 #include "rocksdb/options.h"
 #include "rocksdb/wal_filter.h"
-#include "util/cf_options.h"
 #include "util/file_reader_writer.h"
 #include "util/mpsc.h"
 #include "util/mutexlock.h"
 #include "util/timer_queue.h"
 #include "utilities/blob_db/blob_db.h"
+#include "utilities/blob_db/blob_log_format.h"
+#include "utilities/blob_db/blob_log_reader.h"
+#include "utilities/blob_db/blob_log_writer.h"
 
 namespace rocksdb {
 
-class BlobFile;
 class DBImpl;
 class ColumnFamilyHandle;
 class OptimisticTransactionDBImpl;
-class FlushJobInfo;
+struct FlushJobInfo;
+
+namespace blobstorage {
+
+class BlobFile;
 class BlobDBImpl;
-class BlockHandle;
 
 class BlobDBFlushBeginListener : public EventListener {
  public:
-  explicit BlobDBFlushBeginListener(): impl_(nullptr) {}
+  explicit BlobDBFlushBeginListener() : impl_(nullptr) {}
 
-  void OnFlushBegin(
-      DB* db, const FlushJobInfo& info) override;
+  void OnFlushBegin(DB* db, const FlushJobInfo& info) override;
 
-  void setImplPtr(BlobDBImpl *p) { impl_ = p; }
+  void setImplPtr(BlobDBImpl* p) { impl_ = p; }
 
  protected:
-  BlobDBImpl *impl_;
+  BlobDBImpl* impl_;
 };
 
 // this implements the callback from the WAL which ensures that the
@@ -61,18 +63,16 @@ class BlobDBFlushBeginListener : public EventListener {
 class BlobReconcileWalFilter : public WalFilter {
  public:
   virtual WalFilter::WalProcessingOption LogRecordFound(
-    unsigned long long log_number, const std::string& log_file_name,
-    const WriteBatch& batch, WriteBatch* new_batch,
-    bool* batch_changed) override;
+      unsigned long long log_number, const std::string& log_file_name,
+      const WriteBatch& batch, WriteBatch* new_batch,
+      bool* batch_changed) override;
 
-  virtual const char* Name() const override {
-    return "BlobDBWalReconciler";
-  }
+  virtual const char* Name() const override { return "BlobDBWalReconciler"; }
 
-  void setImplPtr(BlobDBImpl *p) { impl_ = p; }
+  void setImplPtr(BlobDBImpl* p) { impl_ = p; }
 
  protected:
-  BlobDBImpl *impl_;
+  BlobDBImpl* impl_;
 };
 
 class EvictAllVersionsFilter : public CompactionFilter {
@@ -80,26 +80,25 @@ class EvictAllVersionsFilter : public CompactionFilter {
   BlobDBImpl* impl_;
 
  public:
-  explicit EvictAllVersionsFilter(BlobDBImpl *par) : impl_(par) { }
+  explicit EvictAllVersionsFilter(BlobDBImpl* par) : impl_(par) {}
 
   virtual void Callback(int level, const Slice& key, ValueType value_type,
-    const Slice& existing_value, const SequenceNumber& sn, bool is_new) const
-    override;
+                        const Slice& existing_value, const SequenceNumber& sn,
+                        bool is_new) const override;
 
   virtual bool AllVersions() const override { return true; }
 
-  virtual const char* Name() const override {
-    return "EvictAllVersionsFilter";
-  }
+  virtual const char* Name() const override { return "EvictAllVersionsFilter"; }
 };
 
 class EvictAllVersionsFilterFactory : public CompactionFilterFactory {
  private:
   BlobDBImpl* impl_;
+
  public:
   EvictAllVersionsFilterFactory() : impl_(nullptr) {}
 
-  void setImplPtr(BlobDBImpl *p) { impl_ = p; }
+  void setImplPtr(BlobDBImpl* p) { impl_ = p; }
 
   virtual std::unique_ptr<CompactionFilter> CreateCompactionFilter(
       const CompactionFilter::Context& context) override;
@@ -112,13 +111,9 @@ class EvictAllVersionsFilterFactory : public CompactionFilterFactory {
 // Comparator to sort "TTL" aware Blob files based on the lower value of
 // TTL range.
 struct blobf_compare_ttl {
-  bool operator() (const std::shared_ptr<BlobFile>& lhs,
-    const std::shared_ptr<BlobFile>& rhs) const;
+  bool operator()(const std::shared_ptr<BlobFile>& lhs,
+                  const std::shared_ptr<BlobFile>& rhs) const;
 };
-
-typedef std::pair<uint32_t, uint32_t> ttlrange_t;
-typedef std::pair<uint64_t, uint64_t> tsrange_t;
-typedef std::pair<rocksdb::SequenceNumber, rocksdb::SequenceNumber> snrange_t;
 
 /**
  * The implementation class for BlobDB. This manages the value
@@ -130,60 +125,56 @@ class BlobDBImpl : public BlobDB {
   friend class EvictAllVersionsFilter;
   friend class BlobDB;
   friend class BlobFile;
+
  public:
   using rocksdb::StackableDB::Put;
-  Status Put(const WriteOptions& options,
-    ColumnFamilyHandle* column_family, const Slice& key,
-    const Slice& value) override;
+  Status Put(const WriteOptions& options, ColumnFamilyHandle* column_family,
+             const Slice& key, const Slice& value) override;
 
   using rocksdb::StackableDB::Delete;
-  Status Delete(const WriteOptions& options,
-    ColumnFamilyHandle* column_family, const Slice& key)
-    override;
+  Status Delete(const WriteOptions& options, ColumnFamilyHandle* column_family,
+                const Slice& key) override;
 
   using rocksdb::StackableDB::SingleDelete;
   virtual Status SingleDelete(const WriteOptions& wopts,
-    ColumnFamilyHandle* column_family,
-    const Slice& key) override;
+                              ColumnFamilyHandle* column_family,
+                              const Slice& key) override;
 
   using rocksdb::StackableDB::Get;
-  Status Get(const ReadOptions& options,
-    ColumnFamilyHandle* column_family, const Slice& key,
-    std::string* value) override;
+  Status Get(const ReadOptions& options, ColumnFamilyHandle* column_family,
+             const Slice& key, std::string* value) override;
 
   using rocksdb::StackableDB::MultiGet;
   virtual std::vector<Status> MultiGet(
-    const ReadOptions& options,
-    const std::vector<ColumnFamilyHandle*>& column_family,
-    const std::vector<Slice>& keys,
-    std::vector<std::string>* values) override;
+      const ReadOptions& options,
+      const std::vector<ColumnFamilyHandle*>& column_family,
+      const std::vector<Slice>& keys,
+      std::vector<std::string>* values) override;
 
-  virtual Status Write(const WriteOptions& opts,
-    WriteBatch* updates) override;
+  virtual Status Write(const WriteOptions& opts, WriteBatch* updates) override;
 
-  using rocksdb::BlobDB::PutWithTTL;
+  using BlobDB::PutWithTTL;
   Status PutWithTTL(const WriteOptions& options,
-    ColumnFamilyHandle* column_family, const Slice& key,
-    const Slice& value, int32_t ttl) override;
+                    ColumnFamilyHandle* column_family, const Slice& key,
+                    const Slice& value, int32_t ttl) override;
 
-  using rocksdb::BlobDB::PutUntil;
+  using BlobDB::PutUntil;
   Status PutUntil(const WriteOptions& options,
-    ColumnFamilyHandle* column_family, const Slice& key,
-    const Slice& value, int32_t expiration) override;
+                  ColumnFamilyHandle* column_family, const Slice& key,
+                  const Slice& value_unc, int32_t expiration) override;
 
   Status LinkToBaseDB(DB* db) override;
 
   BlobDBImpl(DB* db, const BlobDBOptions& bdb_options);
 
   BlobDBImpl(const std::string& dbname, const BlobDBOptions& bdb_options,
-    const Options& options, const DBOptions& db_options,
-    const EnvOptions& env_options);
+             const DBOptions& db_options);
 
   ~BlobDBImpl();
 
  private:
-  static bool extractTTLFromBlob(const Slice& value, Slice *newval,
-    int32_t *ttl_val);
+  static bool extractTTLFromBlob(const Slice& value, Slice* newval,
+                                 int32_t* ttl_val);
 
   Status openPhase1();
 
@@ -194,14 +185,14 @@ class BlobDBImpl : public BlobDB {
   // timer queue callback to close a file by appending a footer
   // removes file from open files list
   std::pair<bool, int64_t> closeSeqWrite(std::shared_ptr<BlobFile> bfile,
-    bool aborted);
+                                         bool aborted);
 
   // is this file ready for Garbage collection. if the TTL of the file
   // has expired or if threshold of the file has been evicted
   // tt - current time
   // last_id - the id of the non-TTL file to evict
   bool shouldGCFile_locked(std::shared_ptr<BlobFile> bfile, std::time_t tt,
-    uint64_t last_id, std::string *reason);
+                           uint64_t last_id, std::string* reason);
 
   // collect all the blob log files from the blob directory
   Status getAllLogFiles(std::set<std::pair<uint64_t, std::string>>* file_nums);
@@ -210,11 +201,11 @@ class BlobDBImpl : public BlobDB {
   void closeIf(const std::shared_ptr<BlobFile>& bfile);
 
   Status appendBlob(const std::shared_ptr<BlobFile>& bfile,
-    const char *headerbuf, const Slice& key, const Slice& value,
-    std::string *index_entry);
+                    const std::string& headerbuf, const Slice& key,
+                    const Slice& value, std::string* index_entry);
 
   Status appendSN(const std::shared_ptr<BlobFile>& bfile,
-      const SequenceNumber& sn);
+                  const SequenceNumber& sn);
 
   // find an existing blob log file based on the expiration unix epoch
   // if such a file does not exist, return nullptr
@@ -260,6 +251,14 @@ class BlobDBImpl : public BlobDB {
 
   std::pair<bool, int64_t> evictCompacted(bool aborted);
 
+  bool callbackEvicts_Impl(std::shared_ptr<BlobFile> bfile);
+
+  std::pair<bool, int64_t> removeTimerQ(TimerQueue* tq, bool aborted);
+
+  std::pair<bool, int64_t> callbackEvicts(TimerQueue* tq,
+                                          std::shared_ptr<BlobFile> bfile,
+                                          bool aborted);
+
   // Adds the background tasks to the timer queue
   void startBackgroundTasks();
 
@@ -271,8 +270,8 @@ class BlobDBImpl : public BlobDB {
   // hold write mutex on file and call
   // creates a Random Access reader for GET call
   std::shared_ptr<RandomAccessFileReader> openRandomAccess_locked(
-    const std::shared_ptr<BlobFile>& bfile, Env *env,
-    const EnvOptions& env_options);
+      const std::shared_ptr<BlobFile>& bfile, Env* env,
+      const EnvOptions& env_options);
 
   // hold write mutex on file and call.
   // Close the above Random Access reader
@@ -280,19 +279,18 @@ class BlobDBImpl : public BlobDB {
 
   // hold write mutex on file and call
   // creates a sequential (append) writer for this blobfile
-  Status createWriter_locked(const std::shared_ptr<BlobFile> &bfile,
-    bool reopen = false);
+  Status createWriter_locked(const std::shared_ptr<BlobFile>& bfile);
 
   // returns a Writer object for the file. If writer is not
   // already present, creates one. Needs Write Mutex to be held
-  std::shared_ptr<blob_log::Writer>
-    checkOrCreateWriter_locked(const std::shared_ptr<BlobFile>& bfile);
+  std::shared_ptr<Writer> checkOrCreateWriter_locked(
+      const std::shared_ptr<BlobFile>& bfile);
 
   // Iterate through keys and values on Blob and write into
   // separate file the remaining blobd and delete the keys
   // atomically
   Status writeBatchOfDeleteKeys(const std::shared_ptr<BlobFile>& bfptr,
-    std::time_t tt);
+                                std::time_t tt);
 
   // checks if there is no snapshot which is referencing the
   // blobs
@@ -301,17 +299,14 @@ class BlobDBImpl : public BlobDB {
 
   bool markBlobDeleted(const Slice& key, const Slice& lsmValue);
 
-  static bool parseLSMValue(const Slice& lsmval, uint64_t *file_number,
-      BlockHandle *handle);
-
   bool findFileAndEvictABlob(uint64_t file_number, uint64_t key_size,
-      uint64_t blob_offset, uint64_t blob_size);
+                             uint64_t blob_offset, uint64_t blob_size);
 
  private:
   // the base DB
   DBImpl* db_impl_;
 
-  Env *myenv_;
+  Env* myenv_;
 
   // Optimistic Transaction DB used during Garbage collection
   // for atomicity
@@ -323,8 +318,6 @@ class BlobDBImpl : public BlobDB {
 
   // the options that govern the behavior of Blob Storage
   BlobDBOptions bdb_options_;
-
-  ImmutableCFOptions ioptions_;
   DBOptions db_options_;
   EnvOptions env_options_;
 
@@ -334,6 +327,11 @@ class BlobDBImpl : public BlobDB {
   // by default this is "blob_dir" under dbname_
   // but can be configured
   std::string blob_dir_;
+
+  // pointer to directory
+  std::unique_ptr<Directory> dir_ent_;
+
+  std::atomic<bool> dir_change_;
 
   // Read Write Mutex, which protects all the data structures
   // HEAVILY TRAFFICKED
@@ -349,7 +347,7 @@ class BlobDBImpl : public BlobDB {
   std::atomic<uint64_t> epoch_of_;
 
   // typically we keep 4 open blob files (simple i.e. no TTL)
-  std::vector<std::shared_ptr<BlobFile> > open_simple_files_;
+  std::vector<std::shared_ptr<BlobFile>> open_simple_files_;
 
   // all the blob files which are currently being appended to based
   // on variety of incoming TTL's
@@ -357,7 +355,7 @@ class BlobDBImpl : public BlobDB {
 
   // packet of information to put in lockess delete(s) queue
   struct delete_packet_t {
-    ColumnFamilyHandle *cfh_;
+    ColumnFamilyHandle* cfh_;
     std::string key_;
     SequenceNumber dsn_;
   };
@@ -386,6 +384,9 @@ class BlobDBImpl : public BlobDB {
   // timer based queue to execute tasks
   TimerQueue tqueue_;
 
+  // timer queues to call eviction callbacks.
+  std::vector<std::shared_ptr<TimerQueue>> cb_threads_;
+
   // only accessed in GC thread, hence not atomic. The epoch of the
   // GC task. Each execution is one epoch. Helps us in allocating
   // files to one execution
@@ -411,6 +412,8 @@ class BlobDBImpl : public BlobDB {
   std::atomic<uint64_t> total_blob_space_;
   std::list<std::shared_ptr<BlobFile>> obsolete_files_;
   bool open_p1_done_;
+
+  uint32_t debug_level_;
 };
 
 class BlobFile {
@@ -419,7 +422,7 @@ class BlobFile {
 
  private:
   // access to parent
-  const BlobDBImpl *parent_;
+  const BlobDBImpl* parent_;
 
   // path to blob directory
   std::string path_to_dir_;
@@ -444,7 +447,7 @@ class BlobFile {
   // size of deleted blobs (used by heuristic to select file for GC)
   uint64_t deleted_size_;
 
-  blob_log::BlobLogHeader header_;
+  BlobLogHeader header_;
 
   // closed_ = true implies the file is no more mutable
   // no more blobs will be appended and the footer has been written out
@@ -464,7 +467,7 @@ class BlobFile {
   snrange_t sn_range_;
 
   // Sequential/Append writer for blobs
-  std::shared_ptr<blob_log::Writer> log_writer_;
+  std::shared_ptr<Writer> log_writer_;
 
   // random access file reader for GET calls
   std::shared_ptr<RandomAccessFileReader> ra_file_reader_;
@@ -484,11 +487,11 @@ class BlobFile {
  public:
   BlobFile();
 
-  BlobFile(const BlobDBImpl *parent, const std::string& bdir, uint64_t fnum);
+  BlobFile(const BlobDBImpl* parent, const std::string& bdir, uint64_t fnum);
 
   ~BlobFile();
 
-  ColumnFamilyHandle *GetColumnFamily(DB *db);
+  ColumnFamilyHandle* GetColumnFamily(DB* db);
 
   // Returns log file's pathname relative to the main db dir
   // Eg. For a live-log-file = blob_dir/000003.blob
@@ -503,6 +506,8 @@ class BlobFile {
   uint64_t BlobCount() const {
     return blob_count_.load(std::memory_order_acquire);
   }
+
+  std::string DumpState() const;
 
   // if the file has gone through GC and blobs have been relocated
   bool Obsolete() const { return can_be_deleted_.load(); }
@@ -519,7 +524,7 @@ class BlobFile {
 
   // All Get functions which are not atomic, will need ReadLock on the mutex
   tsrange_t GetTimeRange() const {
-    assert(HasTimestamps());
+    assert(HasTimestamp());
     return time_range_;
   }
 
@@ -527,43 +532,37 @@ class BlobFile {
 
   snrange_t GetSNRange() const { return sn_range_; }
 
-  bool HasTTL() const { assert(header_valid_); return header_.HasTTL(); }
-
-  bool HasTimestamps() const {
+  bool HasTTL() const {
     assert(header_valid_);
-    return header_.HasTimestamps();
+    return header_.HasTTL();
   }
 
-  std::shared_ptr<blob_log::Writer> GetWriter() const {
-    return log_writer_;
+  bool HasTimestamp() const {
+    assert(header_valid_);
+    return header_.HasTimestamp();
   }
+
+  std::shared_ptr<Writer> GetWriter() const { return log_writer_; }
 
   void Fsync();
 
  private:
-  std::shared_ptr<blob_log::Reader> openSequentialReader(
-    Env *env, const DBOptions& db_options,
-    const EnvOptions& env_options) const;
+  std::shared_ptr<Reader> openSequentialReader(
+      Env* env, const DBOptions& db_options,
+      const EnvOptions& env_options) const;
 
-  Status readFooter_locked(blob_log::BlobLogFooter *footer);
+  Status readFooter_locked(BlobLogFooter* footer);
 
   Status writeFooterAndClose_locked();
 
   std::shared_ptr<RandomAccessFileReader> openRandomAccess_locked(
-    Env *env, const EnvOptions& env_options, bool* fresh_open);
+      Env* env, const EnvOptions& env_options, bool* fresh_open);
 
   void closeRandomAccess_locked();
 
   // this is used, when you are reading only the footer of a
   // previously closed file
-  void setFromFooter_locked(const blob_log::BlobLogFooter& footer);
-
-  void setHeader_locked(const blob_log::BlobLogHeader& hdr);
-
-  // The following set functions will need write lock on the file.
-  void setTTL() { header_.setTTL(); }
-
-  void setTimestamps() { header_.setTimestamps(); }
+  Status setFromFooter_locked(const BlobLogFooter& footer);
 
   void setTimeRange(const tsrange_t& tr) { time_range_ = tr; }
 
@@ -579,4 +578,6 @@ class BlobFile {
   void setCanBeDeleted() { can_be_deleted_ = true; }
 };
 
+}  // namespace blobstorage
 }  // namespace rocksdb
+#endif  // ROCKSDB_LITE

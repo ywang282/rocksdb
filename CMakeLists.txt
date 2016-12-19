@@ -275,9 +275,6 @@ set(SOURCES
         db/internal_stats.cc
         db/log_reader.cc
         db/log_writer.cc
-        db/blob_log_reader.cc
-        db/blob_log_writer.cc
-        db/blob_log_format.cc
         db/managed_iterator.cc
         db/memtable.cc
         db/memtable_allocator.cc
@@ -396,6 +393,9 @@ set(SOURCES
         utilities/backupable/backupable_db.cc
         utilities/blob_db/blob_db.cc
         utilities/blob_db/blob_db_impl.cc
+        utilities/blob_db/blob_log_reader.cc
+        utilities/blob_db/blob_log_writer.cc
+        utilities/blob_db/blob_log_format.cc
         utilities/checkpoint/checkpoint.cc
         utilities/compaction_filters/remove_emptyvalue_compactionfilter.cc
         utilities/date_tiered/date_tiered_db_impl.cc
