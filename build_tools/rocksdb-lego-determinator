@@ -163,13 +163,13 @@ PARALLEL_UNIT_TEST_COMMANDS="[
 #
 UNIT_TEST_COMMANDS="[
     {
-        'name':'Rocksdb Unit Test',
+        'name':'Rocksdb Unit Test yiwu',
         'oncall':'$ONCALL',
         'steps': [
             $CLEANUP_ENV,
             {
-                'name':'Build and test RocksDB debug version',
-                'shell':'$SHM $DEBUG make $PARALLELISM check || $CONTRUN_NAME=check $TASK_CREATION_TOOL',
+                'name':'Build and test RocksDB debug version yiwu',
+                'shell':'echo hello',
                 'user':'root',
                 $PARSER
             },
