@@ -158,20 +158,6 @@ PARALLEL_UNIT_TEST_COMMANDS="[
     }
 ]"
 
-    $cert_request = array(
-      "name" => "Request or update the certificate for root",
-      "shell" => 'mkdir $BOX_DIR/.ssh && /usr/bin/rolecertreq --verbose '.
-                 '--debug --use-dir $BOX_DIR/.ssh',
-      "user" => "root",
-    );
-
-
-    $ssh_access_sanity_check = array(
-      "name" => "Verify SSH access to ".$hostName,
-      "shell" => '/usr/bin/ssh -i $BOX_DIR/.ssh/id_rsa root@'.$hostName." \"ls\"",
-      "user" => "root",
-    );
-
 #
 # RocksDB unit test
 #
