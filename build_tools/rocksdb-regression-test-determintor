@@ -1,0 +1,32 @@
+#!/bin/bash
+
+DAILY_REGRESSION_TEST_COMMANDS="[
+    {
+        'name':'RocksDB daily regression test',
+        'oncall':'rocksdb_point_of_contact',
+        'steps': [
+            {
+                'name':'Request or update the certificate for root',
+                'shell':'mkdir -p .ssh && /usr/bin/rolecertreq --verbose --debug --use-dir .ssh',
+                'user':'root',
+            },
+            {
+                'name':'Verify SSH access',
+                'shell':'/usr/bin/ssh -i .ssh/id_rsa root@udb4470.prn1.facebook.com ls',
+                'user':'root',
+            },
+            {
+                'name':'Build RocksDB tools',
+                'shell':'cd fbcode/fbcode && buck build rocks/tools/..',
+                'user':'root',
+            },
+            {
+                'name':'Run RocksDB regression test script',
+                'shell':'REMOTE_HOST=fbcode/fbcode/rocks/tools/rocks_regression_test.sh',
+                'user':'root',
+            },
+        ],
+    }
+]"
+
+echo $DAILY_REGRESSION_TEST_COMMANDS

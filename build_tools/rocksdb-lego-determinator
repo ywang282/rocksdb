@@ -163,17 +163,15 @@ PARALLEL_UNIT_TEST_COMMANDS="[
 #
 UNIT_TEST_COMMANDS="[
     {
-        'name':'Rocksdb Unit Test yiwu',
+        'name':'Rocksdb Unit Test',
         'oncall':'$ONCALL',
         'steps': [
+            $CLEANUP_ENV,
             {
-                'name':'req cert',
-                'shell':'mkdir -p .ssh && /usr/bin/rolecertreq --verbose --debug --use-dir .ssh',
+                'name':'Build and test RocksDB debug version',
+                'shell':'$SHM $DEBUG make $PARALLELISM check || $CONTRUN_NAME=check $TASK_CREATION_TOOL',
                 'user':'root',
-            },
-            {
-                'name':'verify ssh',
-                'shell':'/usr/bin/ssh -i .ssh root@udb4470.prn1.facebook.com ls',
+                $PARSER
             },
         ],
         $REPORT
